@@ -5,38 +5,6 @@
 
 #define BUF_SIZE 1024
 
-void printlines(int fd, char *filename, int numLines);
-
-int main(int argc, char *argv[]) {
-    int arg_index = 0;
-    int file_descriptor = 0;
-    int lines_to_print = 10; // default to 10 lines
-    char *file_name = "";
-
-    if (argc > 1) {
-        for (arg_index = 1; arg_index < argc; arg_index++) {
-            char *current_arg = argv[arg_index];
-
-            if (current_arg[0] == '-') {
-                current_arg++;
-                lines_to_print = atoi(current_arg);
-            } else {
-                file_name = current_arg;
-                file_descriptor = open(file_name, O_RDONLY);
-
-                if (file_descriptor < 0) {
-                    printf(1, "tail: cannot open file %s\n", file_name);
-                    return 1;
-                }
-            }
-        }
-    }
-
-    printlines(file_descriptor, file_name, lines_to_print);
-    close(file_descriptor);
-    exit();
-}
-
 void printlines(int file_descriptor, char *file_name, int lines_to_print) {
     int buffer_index = 0;
     char buffer[BUF_SIZE];
@@ -93,4 +61,34 @@ void printlines(int file_descriptor, char *file_name, int lines_to_print) {
 
     close(temp_file_descriptor);
     unlink("temporary_file");
+}
+
+int main(int argc, char *argv[]) {
+    int arg_index = 0;
+    int file_descriptor = 0;
+    int lines_to_print = 10; // default to 10 lines
+    char *file_name = "";
+
+    if (argc > 1) {
+        for (arg_index = 1; arg_index < argc; arg_index++) {
+            char *current_arg = argv[arg_index];
+
+            if (current_arg[0] == '-') {
+                current_arg++;
+                lines_to_print = atoi(current_arg);
+            } else {
+                file_name = current_arg;
+                file_descriptor = open(file_name, O_RDONLY);
+
+                if (file_descriptor < 0) {
+                    printf(1, "tail: cannot open file %s\n", file_name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    printlines(file_descriptor, file_name, lines_to_print);
+    close(file_descriptor);
+    exit();
 }
