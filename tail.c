@@ -3,54 +3,66 @@
 #include "user.h"
 #include "fcntl.h"
 
-#define BUF_SIZE 1024
+#define BUFFER_CAPACITY 1024
 
-void printlines(int file_descriptor, char *file_name, int lines_to_print) {
-    int buffer_index = 0;
-    char buffer[BUF_SIZE];
-    int bytes_read = 0;
-    int total_lines = 0;
-    int current_line_count = 0;
-    char last_char = '\0';
+void tail_lines(int fd, char *fname, int nlines) {
+    int read_count = 0, idx = 0, total_newlines = 0, current_count = 0;
+    char tempbuf[BUFFER_CAPACITY];
+    char last_char = 0;
 
-    int temp_file_descriptor = open("temporary_file", O_CREATE | O_RDWR);
-    if (temp_file_descriptor < 0) {
-        printf(1, "tail: error creating temporary file\n");
+    int temp_fd = open("tempfile", O_CREATE | O_RDWR);
+    if (temp_fd < 0) {
+        printf(1, "tail: failed to create tempfile\n");
         exit();
     }
 
-    while ((bytes_read = read(file_descriptor, buffer, sizeof(buffer))) > 0) {
-        write(temp_file_descriptor, buffer, bytes_read);
-        for (buffer_index = 0; buffer_index < bytes_read; buffer_index++) {
-            if (buffer[buffer_index] == '\n') {
-                total_lines++;
+    while ((read_count = read(fd, tempbuf, sizeof(tempbuf))) > 0) {
+        if (write(temp_fd, tempbuf, read_count) != read_count) {
+            printf(1, "tail: write error\n");
+            close(temp_fd);
+            unlink("tempfile");
+            exit();
+        }
+        for (idx = 0; idx < read_count; idx++) {
+            if (tempbuf[idx] == '\n') {
+                total_newlines++;
             }
-            last_char = buffer[buffer_index];
+            last_char = tempbuf[idx];
         }
     }
 
     if (last_char != '\n') {
-        total_lines++;
+        total_newlines++;
     }
 
-    if (bytes_read < 0) {
+    if (read_count < 0) {
         printf(1, "tail: read error\n");
-        close(temp_file_descriptor);
-        unlink("temporary_file");
+        close(temp_fd);
+        unlink("tempfile");
         exit();
     }
 
-    close(temp_file_descriptor);
+    close(temp_fd);
 
-    temp_file_descriptor = open("temporary_file", O_RDONLY);
+    temp_fd = open("tempfile", O_RDONLY);
+    if (temp_fd < 0) {
+        printf(1, "tail: failed to reopen tempfile\n");
+        unlink("tempfile");
+        exit();
+    }
 
-    while ((bytes_read = read(temp_file_descriptor, buffer, sizeof(buffer))) > 0) {
-        for (buffer_index = 0; buffer_index < bytes_read; buffer_index++) {
-            if (current_line_count >= (total_lines - lines_to_print)) {
-                printf(1, "%c", buffer[buffer_index]);
+    int startLine = total_newlines - nlines;
+    if (startLine < 0) {
+        startLine = 0;
+    }
+
+    while ((read_count = read(temp_fd, tempbuf, sizeof(tempbuf))) > 0) {
+        for (idx = 0; idx < read_count; idx++) {
+            if (current_count >= startLine) {
+                printf(1, "%c", tempbuf[idx]);
             }
-            if (buffer[buffer_index] == '\n') {
-                current_line_count++;
+            if (tempbuf[idx] == '\n') {
+                current_count++;
             }
         }
     }
@@ -59,36 +71,35 @@ void printlines(int file_descriptor, char *file_name, int lines_to_print) {
         printf(1, "\n");
     }
 
-    close(temp_file_descriptor);
-    unlink("temporary_file");
+    close(temp_fd);
+    unlink("tempfile");
 }
 
 int main(int argc, char *argv[]) {
-    int arg_index = 0;
-    int file_descriptor = 0;
-    int lines_to_print = 10; // default to 10 lines
-    char *file_name = "";
+    int i = 0;
+    int fd = 0;
+    int lines_to_show = 10; // default
+    char *filename = "";
 
     if (argc > 1) {
-        for (arg_index = 1; arg_index < argc; arg_index++) {
-            char *current_arg = argv[arg_index];
+        for (i = 1; i < argc; i++) {
+            char *arg = argv[i];
 
-            if (current_arg[0] == '-') {
-                current_arg++;
-                lines_to_print = atoi(current_arg);
+            if (arg[0] == '-') {
+                arg++;
+                lines_to_show = atoi(arg);
             } else {
-                file_name = current_arg;
-                file_descriptor = open(file_name, O_RDONLY);
-
-                if (file_descriptor < 0) {
-                    printf(1, "tail: cannot open file %s\n", file_name);
+                filename = arg;
+                fd = open(filename, O_RDONLY);
+                if (fd < 0) {
+                    printf(1, "tail: cannot open file %s\n", filename);
                     return 1;
                 }
             }
         }
     }
 
-    printlines(file_descriptor, file_name, lines_to_print);
-    close(file_descriptor);
+    tail_lines(fd, filename, lines_to_show);
+    close(fd);
     exit();
 }
